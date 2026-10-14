@@ -1,0 +1,942 @@
+<!DOCTYPE html>
+<html lang="zh-CN">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1, maximum-scale=1, user-scalable=no, viewport-fit=cover">
+<meta name="apple-mobile-web-app-capable" content="yes">
+<meta name="mobile-web-app-capable" content="yes">
+<meta name="apple-mobile-web-app-status-bar-style" content="black-translucent">
+<meta name="apple-mobile-web-app-title" content="地信2607">
+<meta name="theme-color" content="#0f172a">
+<title>地信2607 课表</title>
+<style>
+* { margin:0; padding:0; box-sizing:border-box;
+    -webkit-tap-highlight-color:transparent;
+    -webkit-touch-callout:none; }
+:root {
+  --bg:#0f172a; --surface:#1e293b; --surface2:#334155;
+  --text:#f1f5f9; --dim:#94a3b8;
+  --accent:#38bdf8; --green:#34d399; --yellow:#fbbf24;
+  --red:#f87171; --purple:#a78bfa;
+  --appbar-h:56px; --tabbar-h:64px;
+  --radius:16px;
+}
+html, body { height:100%; overflow-x:hidden; }
+body {
+  background:var(--bg); color:var(--text);
+  font-family:-apple-system, BlinkMacSystemFont, "PingFang SC",
+              "Microsoft YaHei", "Segoe UI", Roboto, sans-serif;
+  font-size:15px; line-height:1.5;
+  overscroll-behavior-y:none;
+  -webkit-font-smoothing:antialiased;
+  padding-top:calc(var(--appbar-h) + env(safe-area-inset-top));
+  padding-bottom:calc(var(--tabbar-h) + env(safe-area-inset-bottom));
+  user-select:none;
+}
+input, textarea, select { user-select:text; -webkit-user-select:text; }
+
+#splash {
+  position:fixed; inset:0; z-index:9999;
+  background:var(--bg);
+  display:flex; flex-direction:column;
+  align-items:center; justify-content:center;
+  transition:opacity .5s, visibility .5s;
+}
+#splash.hide { opacity:0; visibility:hidden; }
+#splash .logo {
+  width:88px; height:88px; border-radius:22px;
+  background:linear-gradient(135deg, var(--accent), var(--purple));
+  display:flex; align-items:center; justify-content:center;
+  font-size:44px; font-weight:700; color:#0f172a;
+  box-shadow:0 12px 32px rgba(56,189,248,.35);
+  animation:pop .6s cubic-bezier(.34,1.56,.64,1);
+}
+@keyframes pop {
+  0% { transform:scale(0.5); opacity:0; }
+  100% { transform:scale(1); opacity:1; }
+}
+#splash .app-name {
+  margin-top:20px; font-size:20px; font-weight:700;
+  letter-spacing:2px;
+}
+#splash .sub {
+  margin-top:6px; font-size:12px; color:var(--dim);
+  letter-spacing:1px;
+}
+
+.app-bar {
+  position:fixed; top:0; left:0; right:0;
+  height:calc(var(--appbar-h) + env(safe-area-inset-top));
+  padding:env(safe-area-inset-top) 8px 0 16px;
+  background:rgba(15,23,42,.85);
+  backdrop-filter:saturate(180%) blur(20px);
+  -webkit-backdrop-filter:saturate(180%) blur(20px);
+  border-bottom:1px solid rgba(148,163,184,.12);
+  display:flex; align-items:center;
+  justify-content:space-between;
+  z-index:100;
+}
+.app-bar-title {
+  display:flex; flex-direction:column;
+  gap:1px; min-width:0; flex:1;
+}
+.app-bar-title .line1 {
+  font-size:17px; font-weight:700;
+  white-space:nowrap; overflow:hidden; text-overflow:ellipsis;
+}
+.app-bar-title .line2 {
+  font-size:11px; color:var(--dim);
+  white-space:nowrap; overflow:hidden; text-overflow:ellipsis;
+}
+.app-bar-actions { display:flex; gap:4px; }
+.icon-btn {
+  width:40px; height:40px;
+  background:transparent; border:none;
+  color:var(--text); cursor:pointer;
+  border-radius:50%;
+  display:flex; align-items:center; justify-content:center;
+  transition:background .15s, transform .1s;
+}
+.icon-btn:active { background:rgba(148,163,184,.15); transform:scale(.92); }
+.icon-btn svg { width:22px; height:22px; }
+
+main {
+  min-height:calc(100vh - var(--appbar-h) - var(--tabbar-h));
+  padding:12px 12px 24px;
+}
+.page { display:none; }
+.page.active {
+  display:block;
+  animation:pageIn .25s cubic-bezier(.2,.7,.3,1);
+}
+@keyframes pageIn {
+  from { opacity:0; transform:translateY(10px); }
+  to { opacity:1; transform:translateY(0); }
+}
+
+.section-title {
+  font-size:12px; color:var(--dim);
+  letter-spacing:1px; text-transform:uppercase;
+  margin:6px 4px 8px; display:flex;
+  align-items:center; gap:6px;
+}
+
+.course {
+  background:var(--surface);
+  border-radius:var(--radius);
+  padding:14px 16px;
+  margin-bottom:10px;
+  border-left:3px solid var(--surface2);
+  position:relative;
+  transition:transform .12s;
+  cursor:pointer;
+}
+.course:active { transform:scale(.98); }
+.course.now {
+  border-left-color:var(--green);
+  background:linear-gradient(100deg, rgba(52,211,153,.14) 0%, var(--surface) 65%);
+}
+.course.next { border-left-color:var(--yellow); }
+.course.done { opacity:.5; }
+.course .row1 {
+  display:flex; justify-content:space-between;
+  align-items:baseline; margin-bottom:6px;
+}
+.course .time { font-size:13px; color:var(--accent); font-weight:700; letter-spacing:.3px; }
+.course .period { font-size:11px; color:var(--dim); }
+.course .name { font-size:16px; font-weight:600; margin-bottom:6px; }
+.course .meta { font-size:12px; color:var(--dim); line-height:1.6; }
+.badge {
+  display:inline-block; padding:2px 10px;
+  border-radius:12px; font-size:11px;
+  margin-left:8px; font-weight:700;
+  background:var(--green); color:#052e2b;
+}
+.course.next .badge { background:var(--yellow); color:#422006; }
+
+.empty {
+  text-align:center; color:var(--dim);
+  padding:60px 20px; font-size:14px;
+  line-height:1.8;
+}
+.empty .big { font-size:48px; margin-bottom:12px; display:block; }
+
+.day-head {
+  display:flex; align-items:center; gap:8px;
+  padding:14px 4px 8px; font-weight:700;
+  color:var(--accent); font-size:14px;
+  letter-spacing:.5px;
+}
+.day-head.today { color:var(--green); }
+.day-head .dot {
+  width:6px; height:6px; border-radius:50%;
+  background:currentColor;
+  box-shadow:0 0 8px currentColor;
+}
+
+.event {
+  background:var(--surface); border-radius:14px;
+  padding:14px 16px; margin-bottom:8px;
+  display:flex; align-items:center; gap:12px;
+  transition:transform .12s;
+}
+.event:active { transform:scale(.98); }
+.event.disabled { opacity:.42; }
+.event .icon {
+  width:40px; height:40px; border-radius:12px;
+  background:rgba(56,189,248,.12);
+  color:var(--accent);
+  display:flex; align-items:center; justify-content:center;
+  font-size:20px; flex-shrink:0;
+}
+.event.off .icon { background:rgba(148,163,184,.12); color:var(--dim); }
+.event .body { flex:1; min-width:0; }
+.event .title-line {
+  font-weight:600; font-size:15px;
+  white-space:nowrap; overflow:hidden; text-overflow:ellipsis;
+}
+.event .sub { font-size:12px; color:var(--dim); margin-top:3px; }
+.event .del {
+  width:36px; height:36px; border-radius:50%;
+  background:rgba(248,113,113,.14); color:var(--red);
+  border:none; font-size:16px; cursor:pointer;
+  display:flex; align-items:center; justify-content:center;
+  transition:transform .1s, background .15s;
+  flex-shrink:0;
+}
+.event .del:active {
+  transform:scale(.88);
+  background:rgba(248,113,113,.25);
+}
+
+.btn {
+  width:100%;
+  padding:15px; border-radius:14px;
+  background:var(--surface2); color:var(--text);
+  border:none; font-size:15px; font-weight:600;
+  cursor:pointer; margin-top:10px;
+  transition:transform .1s;
+  font-family:inherit;
+  display:flex; align-items:center; justify-content:center;
+  gap:8px;
+}
+.btn:active { transform:scale(.97); }
+.btn.primary { background:var(--accent); color:#0c4a6e; }
+.btn.danger { background:rgba(248,113,113,.15); color:var(--red); }
+
+.setting-row {
+  background:var(--surface); border-radius:14px;
+  padding:16px; margin-bottom:8px;
+  display:flex; justify-content:space-between;
+  align-items:center; cursor:pointer;
+  transition:transform .1s;
+}
+.setting-row:active { transform:scale(.98); }
+.setting-row .key { font-size:14px; }
+.setting-row .val { font-size:13px; color:var(--accent); }
+.setting-row .arrow { color:var(--dim); margin-left:4px; }
+
+.fab {
+  position:fixed;
+  right:calc(16px + env(safe-area-inset-right));
+  bottom:calc(var(--tabbar-h) + 16px + env(safe-area-inset-bottom));
+  width:56px; height:56px; border-radius:50%;
+  background:linear-gradient(135deg, var(--accent), var(--purple));
+  color:#0f172a; border:none;
+  font-size:28px; font-weight:300;
+  cursor:pointer;
+  box-shadow:0 8px 24px rgba(56,189,248,.45);
+  display:flex; align-items:center; justify-content:center;
+  z-index:80;
+  transition:transform .15s, box-shadow .15s, opacity .2s, visibility .2s;
+}
+.fab:active { transform:scale(.9); box-shadow:0 4px 12px rgba(56,189,248,.6); }
+.fab.hide { opacity:0; visibility:hidden; transform:scale(.5); pointer-events:none; }
+
+.tab-bar {
+  position:fixed; bottom:0; left:0; right:0;
+  height:calc(var(--tabbar-h) + env(safe-area-inset-bottom));
+  padding-bottom:env(safe-area-inset-bottom);
+  background:rgba(15,23,42,.92);
+  backdrop-filter:saturate(180%) blur(20px);
+  -webkit-backdrop-filter:saturate(180%) blur(20px);
+  border-top:1px solid rgba(148,163,184,.12);
+  display:flex; align-items:stretch;
+  z-index:100;
+}
+.tab-btn {
+  flex:1; background:transparent; border:none;
+  color:var(--dim); font-size:11px; font-family:inherit;
+  cursor:pointer; padding:8px 0;
+  display:flex; flex-direction:column;
+  align-items:center; justify-content:center; gap:3px;
+  position:relative;
+  transition:color .2s;
+  -webkit-tap-highlight-color:transparent;
+}
+.tab-btn:active { background:rgba(148,163,184,.08); }
+.tab-btn svg { width:24px; height:24px; transition:transform .25s; }
+.tab-btn .label { font-size:11px; font-weight:500; }
+.tab-btn.on { color:var(--accent); }
+.tab-btn.on svg { transform:scale(1.1); }
+.tab-btn.on::before {
+  content:"";
+  position:absolute; top:0; left:50%;
+  transform:translateX(-50%);
+  width:36px; height:3px; border-radius:0 0 3px 3px;
+  background:var(--accent);
+  box-shadow:0 0 12px var(--accent);
+  animation:tabOn .25s;
+}
+@keyframes tabOn {
+  from { width:0; opacity:0; }
+  to { width:36px; opacity:1; }
+}
+
+.modal-bg {
+  position:fixed; inset:0; background:rgba(0,0,0,.65);
+  z-index:200; display:none;
+  align-items:flex-end; justify-content:center;
+  backdrop-filter:blur(4px);
+  -webkit-backdrop-filter:blur(4px);
+  animation:fadeIn .2s;
+}
+.modal-bg.on { display:flex; }
+@keyframes fadeIn { from { opacity:0; } to { opacity:1; } }
+.modal {
+  background:var(--surface);
+  border-radius:24px 24px 0 0;
+  width:100%; max-width:540px;
+  padding:8px 20px calc(24px + env(safe-area-inset-bottom));
+  animation:slideUp .28s cubic-bezier(.2,.7,.3,1);
+  max-height:88vh; overflow-y:auto;
+}
+@keyframes slideUp {
+  from { transform:translateY(100%); }
+  to { transform:translateY(0); }
+}
+.modal .grabber {
+  width:40px; height:4px; border-radius:2px;
+  background:var(--surface2);
+  margin:8px auto 16px;
+}
+.modal h3 { font-size:18px; margin-bottom:16px; font-weight:700; }
+.modal label {
+  display:block; font-size:12px; color:var(--dim);
+  margin:14px 0 6px; font-weight:500; letter-spacing:.5px;
+}
+.modal input, .modal select {
+  width:100%; padding:14px 16px;
+  background:var(--bg); color:var(--text);
+  border:1.5px solid var(--surface2); border-radius:12px;
+  font-size:16px; font-family:inherit;
+  transition:border-color .2s;
+}
+.modal input:focus, .modal select:focus {
+  outline:none; border-color:var(--accent);
+}
+.modal .row2 { display:flex; gap:10px; margin-top:22px; }
+.modal .row2 .btn { margin-top:0; flex:1; }
+
+.toast {
+  position:fixed;
+  bottom:calc(var(--tabbar-h) + 90px + env(safe-area-inset-bottom));
+  left:50%; transform:translate(-50%, 20px);
+  background:var(--surface2); color:var(--text);
+  padding:12px 22px; border-radius:24px;
+  font-size:13px; z-index:300;
+  opacity:0; transition:opacity .3s, transform .3s;
+  pointer-events:none;
+  max-width:calc(100% - 40px);
+  box-shadow:0 8px 24px rgba(0,0,0,.4);
+  text-align:center;
+}
+.toast.on { opacity:1; transform:translate(-50%, 0); }
+
+::-webkit-scrollbar { width:4px; height:4px; }
+::-webkit-scrollbar-thumb { background:var(--surface2); border-radius:2px; }
+</style>
+</head>
+<body>
+
+<div id="splash">
+  <div class="logo">课</div>
+  <div class="app-name">地信2607</div>
+  <div class="sub">课程表 · 日程 · 提醒</div>
+</div>
+
+<header class="app-bar">
+  <div class="app-bar-title">
+    <span class="line1" id="hdr-title">地信2607</span>
+    <span class="line2" id="hdr-sub">正在加载...</span>
+  </div>
+  <div class="app-bar-actions">
+    <button class="icon-btn" onclick="manualRefresh()" title="刷新">
+      <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
+        <polyline points="23 4 23 10 17 10"/>
+        <polyline points="1 20 1 14 7 14"/>
+        <path d="M3.51 9a9 9 0 0 1 14.85-3.36L23 10M1 14l4.64 4.36A9 9 0 0 0 20.49 15"/>
+      </svg>
+    </button>
+  </div>
+</header>
+
+<main>
+  <section class="page active" id="page-today"></section>
+  <section class="page" id="page-week"></section>
+  <section class="page" id="page-events"></section>
+  <section class="page" id="page-settings"></section>
+</main>
+
+<!-- 修正 3：加 hide -->
+<button class="fab hide" id="fab" onclick="showAddEvent()" title="添加日程">+</button>
+
+<nav class="tab-bar">
+  <button class="tab-btn on" data-tab="today">
+    <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
+      <rect x="3" y="4" width="18" height="18" rx="3"/>
+      <line x1="16" y1="2" x2="16" y2="6"/>
+      <line x1="8" y1="2" x2="8" y2="6"/>
+      <line x1="3" y1="10" x2="21" y2="10"/>
+    </svg>
+    <span class="label">今日</span>
+  </button>
+  <button class="tab-btn" data-tab="week">
+    <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
+      <line x1="8" y1="6" x2="21" y2="6"/>
+      <line x1="8" y1="12" x2="21" y2="12"/>
+      <line x1="8" y1="18" x2="21" y2="18"/>
+      <line x1="3" y1="6" x2="3.01" y2="6"/>
+      <line x1="3" y1="12" x2="3.01" y2="12"/>
+      <line x1="3" y1="18" x2="3.01" y2="18"/>
+    </svg>
+    <span class="label">本周</span>
+  </button>
+  <button class="tab-btn" data-tab="events">
+    <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
+      <path d="M18 8A6 6 0 0 0 6 8c0 7-3 9-3 9h18s-3-2-3-9"/>
+      <path d="M13.73 21a2 2 0 0 1-3.46 0"/>
+    </svg>
+    <span class="label">日程</span>
+  </button>
+  <button class="tab-btn" data-tab="settings">
+    <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
+      <circle cx="12" cy="12" r="3"/>
+      <path d="M19.4 15a1.65 1.65 0 0 0 .33 1.82l.06.06a2 2 0 0 1 0 2.83 2 2 0 0 1-2.83 0l-.06-.06a1.65 1.65 0 0 0-1.82-.33 1.65 1.65 0 0 0-1 1.51V21a2 2 0 0 1-2 2 2 2 0 0 1-2-2v-.09A1.65 1.65 0 0 0 9 19.4a1.65 1.65 0 0 0-1.82.33l-.06.06a2 2 0 0 1-2.83 0 2 2 0 0 1 0-2.83l.06-.06a1.65 1.65 0 0 0 .33-1.82 1.65 1.65 0 0 0-1.51-1H3a2 2 0 0 1-2-2 2 2 0 0 1 2-2h.09A1.65 1.65 0 0 0 4.6 9a1.65 1.65 0 0 0-.33-1.82l-.06-.06a2 2 0 0 1 0-2.83 2 2 0 0 1 2.83 0l.06.06a1.65 1.65 0 0 0 1.82.33H9a1.65 1.65 0 0 0 1-1.51V3a2 2 0 0 1 2-2 2 2 0 0 1 2 2v.09a1.65 1.65 0 0 0 1 1.51 1.65 1.65 0 0 0 1.82-.33l.06-.06a2 2 0 0 1 2.83 0 2 2 0 0 1 0 2.83l-.06.06a1.65 1.65 0 0 0-.33 1.82V9a1.65 1.65 0 0 0 1.51 1H21a2 2 0 0 1 2 2 2 2 0 0 1-2 2h-.09a1.65 1.65 0 0 0-1.51 1z"/>
+    </svg>
+    <span class="label">设置</span>
+  </button>
+</nav>
+
+<div class="modal-bg" id="modal-bg">
+  <div class="modal" id="modal"></div>
+</div>
+
+<div class="toast" id="toast"></div>
+
+<script>
+// ===== 数据 =====
+const PERIODS = [
+  [1,  "08:00", "08:45", "上午"], [2,  "08:50", "09:35", "上午"],
+  [3,  "09:50", "10:35", "上午"], [4,  "10:45", "11:30", "上午"],
+  [5,  "11:35", "12:20", "上午"], [6,  "14:00", "14:45", "下午"],
+  [7,  "14:50", "15:35", "下午"], [8,  "15:55", "16:40", "下午"],
+  [9,  "16:45", "17:30", "下午"], [10, "18:30", "19:15", "晚上"],
+  [11, "19:20", "20:05", "晚上"], [12, "20:10", "20:55", "晚上"],
+];
+const PERIOD_INFO = {};
+PERIODS.forEach(p => PERIOD_INFO[p[0]] = p);
+
+const WEEK_NAMES = ["星期一","星期二","星期三","星期四","星期五","星期六","星期日"];
+const MAX_WEEK = 20;
+
+function parseWeeks(s) {
+  if (!s) return null;
+  const r = new Set();
+  s.split(",").forEach(part => {
+    part = part.trim();
+    if (!part) return;
+    if (part.includes("-")) {
+      const [a, b] = part.split("-").map(Number);
+      for (let i = a; i <= b; i++) r.add(i);
+    } else r.add(Number(part));
+  });
+  return r;
+}
+
+const COURSES = [
+  {day:0, periods:[4], name:"高等数学", teacher:"朱晓建", room:"劝学C302",
+   weeksRaw:"第2,5,7-16周", weeks:parseWeeks("2,5,7-16")},
+  {day:0, periods:[6], name:"地理信息科学导论", teacher:"宋宜全", room:"劝学C402",
+   weeksRaw:"第2,5,7-13周", weeks:parseWeeks("2,5,7-13")},
+  {day:0, periods:[10], name:"计算机编程基础【实习】", teacher:"郭鹏", room:"博A419",
+   weeksRaw:"第5,7-16周", weeks:parseWeeks("5,7-16")},
+  {day:1, periods:[1], name:"大学英语1", teacher:"", room:"", weeksRaw:"", weeks:null},
+  {day:1, periods:[4], name:"高等数学", teacher:"朱晓建", room:"劝学B216",
+   weeksRaw:"第2,5,7-16周", weeks:parseWeeks("2,5,7-16")},
+  {day:1, periods:[6], name:"习近平生态文明思想", teacher:"张辉", room:"博理B100",
+   weeksRaw:"第2,5,7-12周", weeks:parseWeeks("2,5,7-12")},
+  {day:1, periods:[8], name:"习近平新时代中国特色社会主义思想概论",
+   teacher:"", room:"劝学A201", weeksRaw:"", weeks:null},
+  {day:1, periods:[10], name:"人工智能基础与应用", teacher:"", room:"劝B415/实践课",
+   weeksRaw:"第2周导学，7-12周实践", weeks:parseWeeks("2,7-12")},
+  {day:2, periods:[3], name:"地球科学概论", teacher:"孙艳玲", room:"劝学B115",
+   weeksRaw:"第2,5-15周", weeks:parseWeeks("2,5-15")},
+  {day:2, periods:[6], name:"自然地理学2-1（辅修）", teacher:"宾零陵", room:"劝学B115",
+   weeksRaw:"第2,5-14周", weeks:parseWeeks("2,5-14")},
+  {day:2, periods:[8], name:"就业指导", teacher:"刘亮", room:"劝学C402",
+   weeksRaw:"第10-11周", weeks:parseWeeks("10-11")},
+  {day:2, periods:[8], name:"新时代实践教育", teacher:"", room:"劝学C501",
+   weeksRaw:"第14-16周", weeks:parseWeeks("14-16")},
+  {day:2, periods:[10], name:"计算机编程基础【实习】", teacher:"郭鹏", room:"博A419",
+   weeksRaw:"第7,9,11,13,15周", weeks:parseWeeks("7,9,11,13,15")},
+  {day:3, periods:[1], name:"大学体育4-1", teacher:"", room:"", weeksRaw:"", weeks:null},
+  {day:3, periods:[3], name:"大学物理", teacher:"张虎", room:"劝学B115",
+   weeksRaw:"第2,6-16周", weeks:parseWeeks("2,6-16")},
+  {day:4, periods:[1], name:"自然地理学2-1（辅修）", teacher:"宾零陵", room:"劝学B115",
+   weeksRaw:"第2,6-15周", weeks:parseWeeks("2,6-15")},
+  {day:4, periods:[4], name:"习近平新时代中国特色社会主义思想概论",
+   teacher:"", room:"劝学A201", weeksRaw:"", weeks:null},
+  {day:4, periods:[8], name:"军事理论", teacher:"", room:"劝学B413",
+   weeksRaw:"", weeks:null},
+];
+
+function coursesOn(day, week) {
+  const out = [];
+  COURSES.forEach(c => {
+    if (c.day !== day) return;
+    if (week !== null && c.weeks && !c.weeks.has(week)) return;
+    c.periods.forEach(p => out.push([p, c]));
+  });
+  out.sort((a, b) => a[0] - b[0]);
+  return out;
+}
+function hm(s) { const [h, m] = s.split(":").map(Number); return h * 60 + m; }
+
+// ===== 存储 =====
+const LS_CFG = "tt_config";
+const LS_EVT = "tt_events";
+const DEFAULT_CONFIG = { semesterStart:"2026-09-07", leadMinutes:10, classReminder:true };
+let config = Object.assign({}, DEFAULT_CONFIG, JSON.parse(localStorage.getItem(LS_CFG) || "{}"));
+let events = JSON.parse(localStorage.getItem(LS_EVT) || "[]");
+function saveConfig() { localStorage.setItem(LS_CFG, JSON.stringify(config)); }
+function saveEvents() { localStorage.setItem(LS_EVT, JSON.stringify(events)); }
+
+function currentWeek(d) {
+  d = d || new Date();
+  const start = new Date(config.semesterStart + "T00:00:00");
+  if (isNaN(start)) return null;
+  const day = start.getDay() || 7;
+  start.setDate(start.getDate() - (day - 1));
+  const diff = Math.floor((d - start) / 86400000);
+  if (diff < 0) return 0;
+  return Math.floor(diff / 7) + 1;
+}
+
+// 修正 2：本地日期函数
+function todayLocal() {
+  const d = new Date();
+  return d.getFullYear() + "-" +
+    String(d.getMonth() + 1).padStart(2, "0") + "-" +
+    String(d.getDate()).padStart(2, "0");
+}
+
+// ===== 工具 =====
+const $ = id => document.getElementById(id);
+function esc(s) {
+  return String(s).replace(/[&<>"']/g, m =>
+    ({"&":"&amp;","<":"&lt;",">":"&gt;",'"':"&quot;","'":"&#39;"}[m]));
+}
+function toast(msg, ms=1800) {
+  const t = $("toast");
+  t.textContent = msg;
+  t.classList.add("on");
+  clearTimeout(t._timer);
+  t._timer = setTimeout(() => t.classList.remove("on"), ms);
+}
+
+let currentTab = "today";
+
+// ===== 顶部 =====
+function renderHeader() {
+  const now = new Date();
+  const week = currentWeek(now);
+  let title = "地信2607";
+  if (week === null) title += " · 未知";
+  else if (week === 0) title += " · 未开学";
+  else if (week > MAX_WEEK) title += ` · 第${week}周（假期）`;
+  else title += ` · 第 ${week} 周`;
+  $("hdr-title").textContent = title;
+  const ymd = todayLocal();
+  const wd = WEEK_NAMES[now.getDay() === 0 ? 6 : now.getDay()-1];
+  const t = now.toTimeString().slice(0,8);
+  $("hdr-sub").textContent = `${ymd} · ${wd} · ${t}`;
+}
+
+// ===== 今日 =====
+function renderToday() {
+  const now = new Date();
+  const week = currentWeek(now);
+  const el = $("page-today");
+
+  if (week === null) {
+    el.innerHTML = `<div class="empty"><span class="big">❓</span>无法确定教学周<br>请到设置页检查学期开始日期</div>`;
+    return;
+  }
+  if (week === 0) {
+    el.innerHTML = `<div class="empty"><span class="big">🌱</span>尚未开学<br>第 1 周从 ${esc(config.semesterStart)}（周一）开始</div>`;
+    return;
+  }
+  if (week > MAX_WEEK) {
+    el.innerHTML = `<div class="empty"><span class="big">🏖️</span>已过第 ${MAX_WEEK} 周<br>本学期课表不再显示</div>`;
+    return;
+  }
+
+  const nowMin = now.getHours()*60 + now.getMinutes();
+  const dow = now.getDay() === 0 ? 6 : now.getDay()-1;
+  const cs = coursesOn(dow, week);
+  if (cs.length === 0) {
+    el.innerHTML = `<div class="empty"><span class="big">🎉</span>今天没有课<br>好好休息一下</div>`;
+    return;
+  }
+
+  let current = null, next = null;
+  cs.forEach(([p, c]) => {
+    const st = hm(PERIOD_INFO[p][1]);
+    const en = hm(PERIOD_INFO[p][2]);
+    if (st <= nowMin && nowMin < en) current = [p, c];
+    else if (st > nowMin && !next) next = [p, c];
+  });
+
+  let html = "";
+  if (current) {
+    html += `<div class="section-title" style="color:var(--green)">● 正在上课</div>`;
+    html += renderCard(current[0], current[1], "now", "上课中");
+  } else if (next) {
+    html += `<div class="section-title" style="color:var(--yellow)">▶ 下一节</div>`;
+    html += renderCard(next[0], next[1], "next", "");
+  } else {
+    html += `<div class="section-title" style="color:var(--green)">✓ 今天的课都上完啦</div>`;
+  }
+
+  html += `<div class="section-title" style="margin-top:18px">今日全部课程</div>`;
+  cs.forEach(([p, c]) => {
+    const st = hm(PERIOD_INFO[p][1]);
+    const en = hm(PERIOD_INFO[p][2]);
+    let cls = "";
+    if (st <= nowMin && nowMin < en) cls = "now";
+    else if (nowMin >= en) cls = "done";
+    html += renderCard(p, c, cls, "");
+  });
+  el.innerHTML = html;
+}
+
+function renderCard(p, c, cls, badge) {
+  const info = PERIOD_INFO[p];
+  return `<div class="course ${cls}">
+    <div class="row1">
+      <span class="time">${info[1]} - ${info[2]}</span>
+      <span class="period">第 ${p} 节 · ${info[3]}</span>
+    </div>
+    <div class="name">${esc(c.name)}${badge ? `<span class="badge">${badge}</span>` : ""}</div>
+    <div class="meta">${esc(c.teacher || "-")} · ${esc(c.room || "待定")} · ${esc(c.weeksRaw || "全学期")}</div>
+  </div>`;
+}
+
+// ===== 本周 =====
+function renderWeek() {
+  const now = new Date();
+  const week = currentWeek(now);
+  const el = $("page-week");
+  if (week === null || week === 0 || week > MAX_WEEK) {
+    el.innerHTML = `<div class="empty"><span class="big">📅</span>暂不在教学周内<br>请到设置页检查学期开始日期</div>`;
+    return;
+  }
+  const today = now.getDay() === 0 ? 6 : now.getDay()-1;
+  const nowMin = now.getHours()*60 + now.getMinutes();
+  let html = "";
+  for (let d = 0; d < 7; d++) {
+    const cs = coursesOn(d, week);
+    if (d >= 5 && cs.length === 0) continue;
+    html += `<div class="day-head${d === today ? " today" : ""}">
+      <span class="dot"></span>${WEEK_NAMES[d]}${d === today ? "（今天）" : ""}
+    </div>`;
+    if (cs.length === 0) {
+      html += `<div class="course" style="opacity:.4;padding:12px 16px;font-size:13px">无课</div>`;
+    }
+    cs.forEach(([p, c]) => {
+      const info = PERIOD_INFO[p];
+      const st = hm(info[1]);
+      const en = hm(info[2]);
+      let cls = "";
+      if (d === today && st <= nowMin && nowMin < en) cls = "now";
+      html += `<div class="course ${cls}" style="padding:12px 16px">
+        <div class="row1">
+          <span class="time">${info[1]} - ${info[2]}</span>
+          <span class="period">第 ${p} 节</span>
+        </div>
+        <div class="name" style="font-size:15px">${esc(c.name)}</div>
+        <div class="meta">${esc(c.room || "待定")} · ${esc(c.weeksRaw || "全学期")}</div>
+      </div>`;
+    });
+    html += `<div style="height:6px"></div>`;
+  }
+  el.innerHTML = html || `<div class="empty"><span class="big">📅</span>本周没有课</div>`;
+}
+
+// ===== 日程 =====
+const REPEAT_LABEL = {once:"单次", daily:"每天", weekdays:"工作日", weekly:"每周"};
+
+function renderEvents() {
+  const el = $("page-events");
+  let html = `<div class="section-title">我的提醒 · ${events.length} 条</div>`;
+  if (events.length === 0) {
+    html += `<div class="empty"><span class="big">🔔</span>还没有自定义日程<br>
+      <span style="font-size:12px;color:var(--dim);margin-top:6px;display:inline-block">点击右下角 + 添加</span>
+    </div>`;
+  } else {
+    events.forEach((ev, i) => {
+      const t = ev.time || "全天";
+      const rep = REPEAT_LABEL[ev.repeat] || "";
+      const dateStr = (ev.repeat === "once" && ev.date) ? ` · ${ev.date}` : "";
+      html += `<div class="event${ev.enabled ? "" : " off"}">
+        <div class="icon" onclick="toggleEvent(${i})" style="cursor:pointer">${ev.enabled ? "🔔" : "🔕"}</div>
+        <div class="body" onclick="toggleEvent(${i})" style="cursor:pointer">
+          <div class="title-line">${esc(ev.title)}</div>
+          <div class="sub">${t} · ${rep}${dateStr}</div>
+        </div>
+        <button class="del" onclick="delEvent(${i})">✕</button>
+      </div>`;
+    });
+  }
+  el.innerHTML = html;
+}
+
+function delEvent(i) {
+  if (!confirm(`删除"${events[i].title}"？`)) return;
+  events.splice(i, 1);
+  saveEvents(); renderEvents(); toast("已删除");
+}
+function toggleEvent(i) {
+  events[i].enabled = !events[i].enabled;
+  saveEvents(); renderEvents();
+}
+
+// ===== 设置 =====
+function renderSettings() {
+  const el = $("page-settings");
+  const week = currentWeek();
+  el.innerHTML = `
+    <div class="section-title">学期</div>
+    <div class="setting-row" onclick="editSemester()">
+      <span class="key">学期开始日期</span>
+      <span><span class="val">${config.semesterStart}</span><span class="arrow"> ›</span></span>
+    </div>
+    <div class="setting-row" onclick="editLead()">
+      <span class="key">课前提前提醒</span>
+      <span><span class="val">${config.leadMinutes} 分钟</span><span class="arrow"> ›</span></span>
+    </div>
+    <div class="setting-row" style="cursor:default">
+      <span class="key">当前教学周</span>
+      <span class="val">${week === null ? "?" : "第 " + week + " 周"}</span>
+    </div>
+    <div class="section-title" style="margin-top:20px">通知</div>
+    <button class="btn" onclick="askNotification()">🔔 申请通知权限</button>
+    <button class="btn" onclick="testNotify()">✉️ 测试通知</button>
+    <div class="section-title" style="margin-top:20px">数据</div>
+    <button class="btn" onclick="exportData()">💾 导出备份</button>
+    <button class="btn danger" onclick="resetData()">🗑️ 清空所有日程</button>
+    <div class="section-title" style="margin-top:20px">关于</div>
+    <div class="setting-row" style="cursor:default">
+      <span class="key" style="font-size:12px;color:var(--dim);line-height:1.7">
+        地信2607 课表 · PWA 版<br>数据保存在本机浏览器，不会上传
+      </span>
+    </div>
+  `;
+}
+function editSemester() {
+  const v = prompt("学期开始日期（第 1 周周一）\n格式：YYYY-MM-DD", config.semesterStart);
+  if (!v) return;
+  if (!/^\d{4}-\d{2}-\d{2}$/.test(v) || isNaN(new Date(v))) { toast("格式错误"); return; }
+  config.semesterStart = v; saveConfig(); renderSettings(); toast("已保存");
+}
+function editLead() {
+  const v = prompt("课前提前提醒（分钟，0-120）\n0 = 关闭", config.leadMinutes);
+  if (v === null) return;
+  const n = parseInt(v, 10);
+  if (isNaN(n) || n < 0 || n > 120) { toast("请输入 0-120"); return; }
+  config.leadMinutes = n; config.classReminder = n > 0; saveConfig(); renderSettings(); toast("已保存");
+}
+function askNotification() {
+  if (!("Notification" in window)) { toast("浏览器不支持通知"); return; }
+  Notification.requestPermission().then(p => toast(p === "granted" ? "已授权 ✓" : "被拒绝或忽略"));
+}
+function testNotify() {
+  if (!("Notification" in window) || Notification.permission !== "granted") { toast("请先申请通知权限"); return; }
+  new Notification("地信2607 课表", { body: "这是一条测试通知 🔔" });
+}
+function exportData() {
+  const data = JSON.stringify({ config, events }, null, 2);
+  const blob = new Blob([data], {type:"application/json"});
+  const a = document.createElement("a");
+  a.href = URL.createObjectURL(blob);
+  a.download = "timetable-" + todayLocal() + ".json";
+  a.click(); toast("已导出");
+}
+function resetData() {
+  if (!confirm("确定清空所有自定义日程？")) return;
+  events = []; saveEvents(); renderSettings(); toast("已清空");
+}
+
+// ===== 添加日程 =====
+function showAddEvent() {
+  // 修正 2
+  const today = todayLocal();
+  $("modal").innerHTML = `
+    <div class="grabber"></div>
+    <h3>添加日程</h3>
+    <label>标题</label>
+    <input id="m-title" placeholder="例如：小组开会" autocomplete="off">
+    <label>时间（HH:MM，留空 = 不提醒）</label>
+    <!-- 修正 1：去掉 inputmode -->
+    <input id="m-time" placeholder="15:30" autocomplete="off">
+    <label>日期</label>
+    <input id="m-date" type="date" value="${today}">
+    <label>重复</label>
+    <select id="m-rep">
+      <option value="once">单次</option>
+      <option value="daily">每天</option>
+      <option value="weekdays">工作日</option>
+      <option value="weekly">每周</option>
+    </select>
+    <div class="row2">
+      <button class="btn" onclick="closeModal()">取消</button>
+      <button class="btn primary" onclick="doAddEvent()">保存</button>
+    </div>
+  `;
+  $("modal-bg").classList.add("on");
+  // 修正 4：延迟加长
+  setTimeout(() => { const el = $("m-title"); if (el) el.focus(); }, 450);
+}
+
+function doAddEvent() {
+  const title = $("m-title").value.trim();
+  let time = $("m-time").value.trim();
+  const date = $("m-date").value;
+  const repeat = $("m-rep").value;
+  if (!title) { toast("请输入标题"); return; }
+  if (time) {
+    const m = time.match(/^(\d{1,2}):(\d{2})$/);
+    if (!m || +m[1] > 23 || +m[2] > 59) { toast("时间格式：HH:MM"); return; }
+    time = String(+m[1]).padStart(2,"0") + ":" + m[2];
+  }
+  events.push({
+    id: Date.now() + "-" + Math.random().toString(36).slice(2,8),
+    title, date, time: time || null, repeat, enabled: true,
+  });
+  saveEvents(); closeModal();
+  if (currentTab !== "events") switchTab("events");
+  else renderEvents();
+  toast("已保存 ✓");
+}
+function closeModal() { $("modal-bg").classList.remove("on"); }
+$("modal-bg").addEventListener("click", e => {
+  if (e.target === $("modal-bg")) closeModal();
+});
+// 修正 6：ESC 关闭
+document.addEventListener("keydown", e => {
+  if (e.key === "Escape" && $("modal-bg").classList.contains("on")) closeModal();
+});
+
+// ===== 页面切换 =====
+function switchTab(tab) {
+  currentTab = tab;
+  document.querySelectorAll(".page").forEach(p => p.classList.remove("active"));
+  const el = $("page-" + tab);
+  if (el) el.classList.add("active");
+  document.querySelectorAll(".tab-btn").forEach(b => b.classList.toggle("on", b.dataset.tab === tab));
+  $("fab").classList.toggle("hide", tab !== "events");
+  if (tab === "today") renderToday();
+  else if (tab === "week") renderWeek();
+  else if (tab === "events") renderEvents();
+  else if (tab === "settings") renderSettings();
+  window.scrollTo({top:0, behavior:"smooth"});
+}
+document.querySelectorAll(".tab-btn").forEach(b => {
+  b.addEventListener("click", () => switchTab(b.dataset.tab));
+});
+
+function manualRefresh() {
+  renderHeader();
+  switchTab(currentTab);
+  toast("已刷新");
+}
+
+// ===== 提醒 =====
+const fired = new Set();
+let firedDay = null;
+
+function checkAlarms() {
+  const now = new Date();
+  const today = todayLocal();
+  if (firedDay !== today) { fired.clear(); firedDay = today; }
+
+  const hh = now.getHours();
+  const mm = now.getMinutes();
+  const nowMin = hh*60 + mm;
+  const stamp = today + " " + hh + ":" + mm;
+
+  events.forEach(ev => {
+    if (!ev.enabled || !ev.time) return;
+    const key = ev.id + "@" + stamp;
+    if (fired.has(key)) return;
+    const [eh, em] = ev.time.split(":").map(Number);
+    if (eh !== hh || em !== mm) return;
+    let fire = false;
+    if (ev.repeat === "once") fire = ev.date === today;
+    else if (ev.repeat === "daily") fire = true;
+    else if (ev.repeat === "weekdays") fire = now.getDay() >= 1 && now.getDay() <= 5;
+    else if (ev.repeat === "weekly") fire = new Date(ev.date).getDay() === now.getDay();
+    if (fire) { fired.add(key); notify("⏰ " + ev.title, "时间：" + ev.time); }
+  });
+
+  if (config.classReminder && config.leadMinutes > 0) {
+    const week = currentWeek(now);
+    if (week && week >= 1 && week <= MAX_WEEK) {
+      const dow = now.getDay() === 0 ? 6 : now.getDay()-1;
+      coursesOn(dow, week).forEach(([p, c]) => {
+        const st = hm(PERIOD_INFO[p][1]);
+        const diff = st - nowMin;
+        if (diff > 0 && diff <= config.leadMinutes) {
+          const key = "pre-" + today + "-" + c.name + "-" + p;
+          if (!fired.has(key)) {
+            fired.add(key);
+            notify("📚 上课提醒", `${PERIOD_INFO[p][1]}  第${p}节  ${c.name}\n地点：${c.room || "待定"}`);
+          }
+        }
+      });
+    }
+  }
+}
+function notify(title, body) {
+  if ("Notification" in window && Notification.permission === "granted") {
+    try { new Notification(title, { body, tag: title }); } catch (e) {}
+  }
+  toast(title + " · " + body.split("\n")[0], 4000);
+}
+
+// ===== 启动 =====
+function boot() {
+  renderHeader();
+  switchTab("today");
+  setInterval(renderHeader, 1000);
+  setInterval(checkAlarms, 5000);
+  setInterval(() => {
+    if (currentTab === "today" || currentTab === "week") switchTab(currentTab);
+  }, 60000);
+  setTimeout(() => { $("splash").classList.add("hide"); }, 900);
+}
+boot();
+</script>
+</body>
+</html>
